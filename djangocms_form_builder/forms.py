@@ -45,7 +45,10 @@ class SimpleFrontendForm(forms.Form):
                 raise ValidationError(
                     _("Please login before submitting this form."), code="unauthorized"
                 )
-        return super().clean()
+
+        cleaned_data = super().clean()
+        cleaned_data.pop("captcha_field", None)
+        return cleaned_data
 
     def save(self):
         results = {}
@@ -151,7 +154,7 @@ class FormsForm(mixin_factory("Form"), EntangledModelForm):
     captcha_widget = forms.ChoiceField(
         label=_("Captcha widget"),
         required=False,
-        initial="v2-invisible" if recaptcha.installed else "",
+        initial=recaptcha.CAPTCHA_CHOICES[0][0] if recaptcha.installed else "",
         choices=settings.EMPTY_CHOICE + recaptcha.CAPTCHA_CHOICES,
         help_text=mark_safe_lazy(
             _(
@@ -299,6 +302,7 @@ class FormFieldMixin(EntangledModelFormMixin):
                 "field_label",
                 "field_placeholder",
                 "field_required",
+                "field_help_text",
             ]
         }
 
@@ -329,6 +333,13 @@ class FormFieldMixin(EntangledModelFormMixin):
         help_text=_(
             "If selected form will not accept submissions with with empty data"
         ),
+    )
+    field_help_text = forms.CharField(
+        label=_("Help text"),
+        initial="",
+        required=False,
+        help_text=_("Help text shown below the field."),
+        widget=forms.Textarea,
     )
 
 
@@ -587,6 +598,7 @@ class SubmitButtonForm(
         entangled_fields = {
             "config": [
                 "submit_cta",
+                "form_submit_context",
             ]
         }
 
@@ -594,4 +606,10 @@ class SubmitButtonForm(
         label=_("Button label"),
         initial=_("Submit"),
         required=False,
+    )
+
+    form_submit_context = forms.ChoiceField(
+        label=_("Button context"),
+        choices=constants.SUBMIT_BUTTON_CHOICES,
+        initial=constants.SUBMIT_BUTTON_CHOICES[0][0],
     )

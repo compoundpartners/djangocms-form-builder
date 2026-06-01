@@ -1,5 +1,6 @@
 import hashlib
 
+from cms import __version__ as cms_version
 from cms.models import CMSPlugin
 from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse, QueryDict
@@ -9,6 +10,12 @@ from django.utils.translation import gettext as _
 from django.views import View
 
 _formview_pool = {}
+
+
+if cms_version < "4":
+    SELECT_RELATED = ("placeholder",)
+else:
+    SELECT_RELATED = ("placeholder", "placeholder__content_type")
 
 
 def register_form_view(cls, slug=None):
@@ -33,6 +40,10 @@ class AjaxView(View):
     A Django view to handle AJAX requests for GET and POST methods for django CMS Form Builder forms.
     this view allows django CMS plugins to receive ajax requests if they implement the `ajax_get` and
     `ajax_post` methods. The form plugin implements the `ajax_post` method to handle form submissions.
+
+    GET requests return a freshly-minted CSRF token in the JSON body, which
+    ``ajax_form.js`` uses for the ``X-CSRFToken`` header on the subsequent POST.
+    This works regardless of ``CSRF_COOKIE_HTTPONLY`` or ``CSRF_USE_SESSIONS``.
 
     Methods
     -------
@@ -74,8 +85,19 @@ class AjaxView(View):
         return params
 
     @staticmethod
-    def plugin_instance(pk):
-        plugin = get_object_or_404(CMSPlugin, pk=pk)
+    def plugin_instance(pk, admin_user):
+        try:
+            plugin = CMSPlugin.objects.select_related(*SELECT_RELATED).get(pk=pk)
+        except CMSPlugin.DoesNotExist:
+            raise Http404
+        if "placeholder__content_type" in SELECT_RELATED:
+            source_model = plugin.placeholder.content_type.model_class()
+            if admin_user and hasattr(source_model, "admin_manager"):
+                get_object_or_404(
+                    source_model.admin_manager, pk=plugin.placeholder.object_id
+                )
+            else:
+                get_object_or_404(source_model, pk=plugin.placeholder.object_id)
         plugin.__class__ = plugin.get_plugin_class()
         instance = (
             plugin.model.objects.get(cmsplugin_ptr=plugin.id)
@@ -112,7 +134,9 @@ class AjaxView(View):
                              processing.
         """
         if "instance_id" in kwargs:
-            plugin, instance = self.plugin_instance(kwargs["instance_id"])
+            plugin, instance = self.plugin_instance(
+                kwargs["instance_id"], admin_user=request.user.is_staff
+            )
             if hasattr(plugin, "ajax_post"):
                 request.POST = QueryDict(request.body)
                 try:
@@ -163,7 +187,9 @@ class AjaxView(View):
               the `_formview_pool` and calls its `ajax_get` or `get` method if available.
         """
         if "instance_id" in kwargs:
-            plugin, instance = self.plugin_instance(kwargs["instance_id"])
+            plugin, instance = self.plugin_instance(
+                kwargs["instance_id"], admin_user=request.user.is_staff
+            )
             if hasattr(plugin, "ajax_get"):
                 request.GET = QueryDict(request.body)
                 try:

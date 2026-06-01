@@ -1,16 +1,18 @@
 import json
-from unittest import skipIf
+from unittest import mock, skipIf
+from urllib.parse import urlencode
 
 from cms import __version__ as cms_version
 from cms.api import add_plugin
 from cms.test_utils.testcases import CMSTestCase
-from django.http import JsonResponse
-from django.test import RequestFactory
+from django.http import HttpResponseNotAllowed, JsonResponse
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
 from djangocms_form_builder import cms_plugins
 from djangocms_form_builder.models import FormEntry
 from djangocms_form_builder.views import AjaxView, register_form_view
+from tests.helpers import make_valid_altcha_payload
 
 from .fixtures import TestFixture
 
@@ -52,7 +54,7 @@ class AjaxViewTestCase(TestFixture, CMSTestCase):
             form_name="test-form",
         )
 
-        plugin, instance = AjaxView.plugin_instance(form_plugin.pk)
+        plugin, instance = AjaxView.plugin_instance(form_plugin.pk, admin_user=True)
 
         self.assertIsNotNone(plugin)
         self.assertIsNotNone(instance)
@@ -64,7 +66,7 @@ class AjaxViewTestCase(TestFixture, CMSTestCase):
         from django.http import Http404
 
         with self.assertRaises(Http404):
-            AjaxView.plugin_instance(99999)
+            AjaxView.plugin_instance(99999, admin_user=True)
 
     @skipIf(cms_version < "4", "Form rendering tests require django CMS 4 or higher")
     def test_dispatch_with_json_accept_header_post(self):
@@ -471,11 +473,81 @@ class RegisterFormViewTestCase(CMSTestCase):
 class AjaxGetRequestTestCase(TestFixture, CMSTestCase):
     """Tests for AJAX GET requests"""
 
-    def test_ajax_get_returns_form_content(self):
-        """Test that AJAX GET request returns form content"""
-        # Skip this test as GET requests need special handling in the plugin
-        # The ajax_get method requires get_context_data which needs proper setup
-        self.skipTest("AJAX GET requires more complex setup with context data")
+    def _create_simple_form_plugin(self, form_name="simple-ajax-form"):
+        form_plugin = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.FormPlugin.__name__,
+            language=self.language,
+            form_selection="",
+            form_name=form_name,
+            captcha_widget="",
+        )
+
+        char_field = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.CharFieldPlugin.__name__,
+            target=form_plugin,
+            language=self.language,
+            config={
+                "field_name": "simple_field",
+                "field_label": "Simple Field",
+                "field_required": True,
+            },
+        )
+        char_field.initialize_from_form()
+        return form_plugin
+
+    @override_settings(CSRF_COOKIE_HTTPONLY=False)
+    def test_ajax_get_returns_csrf_token(self):
+        """AJAX GET returns a fresh CSRF token in the JSON body so ajax_form.js
+        can use it as the X-CSRFToken header on the subsequent POST."""
+        form_plugin = self._create_simple_form_plugin("simple-ajax-get")
+        self.publish(self.page, self.language)
+
+        url = reverse("form_builder:ajaxview", kwargs={"instance_id": form_plugin.pk})
+        response = self.client.get(url, headers={"accept": "application/json"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response, JsonResponse)
+        payload = response.json()
+        self.assertIn("csrf_token", payload)
+        self.assertTrue(payload["csrf_token"])
+
+    @override_settings(CSRF_COOKIE_HTTPONLY=True)
+    def test_ajax_get_does_not_leak_token_when_cookie_httponly(self):
+        """When CSRF_COOKIE_HTTPONLY is on, the GET endpoint must not expose the
+        token - the form template renders it inline instead."""
+        form_plugin = self._create_simple_form_plugin("simple-ajax-get-httponly")
+        self.publish(self.page, self.language)
+
+        url = reverse("form_builder:ajaxview", kwargs={"instance_id": form_plugin.pk})
+        response = self.client.get(url, headers={"accept": "application/json"})
+
+        self.assertEqual(response.status_code, 405)
+        self.assertIsInstance(response, HttpResponseNotAllowed)
+
+    def test_ajax_post_simple_form_submission(self):
+        """Test that AJAX POST submits a simple form plugin"""
+        form_plugin = self._create_simple_form_plugin("simple-ajax-post")
+        self.publish(self.page, self.language)
+
+        url = reverse("form_builder:ajaxview", kwargs={"instance_id": form_plugin.pk})
+
+        with self.login_user_context(self.superuser):
+            response = self.client.post(
+                url,
+                data=urlencode({"simple_field": "posted value"}),
+                content_type="application/x-www-form-urlencoded",
+                headers={"accept": "application/json"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response, JsonResponse)
+
+        json_data = response.json()
+        self.assertIn("result", json_data)
+        self.assertIn(json_data["result"], ["success", "error"])
+        self.assertIn("field_errors", json_data)
 
 
 @skipIf(cms_version < "4", "Form plugin tests require django CMS 4 or higher")
@@ -708,6 +780,7 @@ class AjaxFormMixinTestCase(TestFixture, CMSTestCase):
             plugin_type=cms_plugins.FormPlugin.__name__,
             language=self.language,
             form_name="redirect-test",
+            captcha_widget="",
         )
 
         char_field = add_plugin(
@@ -840,3 +913,101 @@ class AjaxFormMixinTestCase(TestFixture, CMSTestCase):
         # Widget should have ID with field name + plugin ID
         expected_id = f"myfield{form_plugin.pk}"
         self.assertEqual(form.fields["myfield"].widget.attrs["id"], expected_id)
+
+    @mock.patch("altcha.verify_solution")
+    def test_form_valid_with_altcha(self, mock_verify_solution):
+        """Test form_valid returns correct JSON with redirect URL"""
+        mock_verify_solution.return_value = (True, None)
+        form_plugin = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.FormPlugin.__name__,
+            language=self.language,
+            form_name="altcha-test",
+            captcha_widget="altcha",
+        )
+
+        char_field = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.CharFieldPlugin.__name__,
+            target=form_plugin,
+            language=self.language,
+            config={"field_name": "data", "field_label": "Data"},
+        )
+        char_field.initialize_from_form()
+
+        plugin_instance = cms_plugins.FormPlugin(
+            model=cms_plugins.FormPlugin.model, admin_site=None
+        )
+        plugin_instance.instance = form_plugin
+        plugin_instance.request = self.get_request("/")
+        form_plugin.child_plugin_instances = [char_field]
+
+        # Create form and set redirect in Meta
+        form_class = plugin_instance.create_form_class_from_plugins()
+        form_class.Meta.options["redirect"] = "/success/"
+
+        valid_payload = make_valid_altcha_payload()
+        form = form_class(
+            data={"data": "test", "captcha_field": valid_payload},
+            request=plugin_instance.request,
+        )
+
+        self.assertTrue(form.is_valid())
+
+        response = plugin_instance.form_valid(form)
+
+        json_data = response.content.decode("utf-8")
+        data = json.loads(json_data)
+
+        self.assertEqual(data["result"], "success")
+        self.assertEqual(data["redirect"], "/success/")
+
+    @mock.patch("altcha.verify_solution")
+    def test_form_invalid_with_altcha(self, mock_verify_solution):
+        """Test form_valid returns correct JSON with redirect URL"""
+        mock_verify_solution.return_value = (False, None)
+        form_plugin = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.FormPlugin.__name__,
+            language=self.language,
+            form_name="altcha-test",
+            captcha_widget="altcha",
+        )
+
+        char_field = add_plugin(
+            placeholder=self.placeholder,
+            plugin_type=cms_plugins.CharFieldPlugin.__name__,
+            target=form_plugin,
+            language=self.language,
+            config={"field_name": "data", "field_label": "Data"},
+        )
+        char_field.initialize_from_form()
+
+        plugin_instance = cms_plugins.FormPlugin(
+            model=cms_plugins.FormPlugin.model, admin_site=None
+        )
+        plugin_instance.instance = form_plugin
+        plugin_instance.request = self.get_request("/")
+        form_plugin.child_plugin_instances = [char_field]
+
+        # Create form and set redirect in Meta
+        form_class = plugin_instance.create_form_class_from_plugins()
+        form_class.Meta.options["redirect"] = "/success/"
+
+        valid_payload = make_valid_altcha_payload()
+        form = form_class(
+            data={"data": "test", "captcha_field": valid_payload},
+            request=plugin_instance.request,
+        )
+
+        self.assertFalse(form.is_valid())
+
+        response = plugin_instance.form_invalid(form)
+        json_data = response.content.decode("utf-8")
+        data = json.loads(json_data)
+
+        self.assertEqual(data["result"], "invalid form")
+        self.assertIn("field_errors", data)
+        self.assertIn(
+            f"captcha_field{plugin_instance.instance.pk}", data["field_errors"]
+        )
