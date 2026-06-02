@@ -12,17 +12,24 @@ if apps.is_installed("captcha"):
     """Soft dependency on django-captcha for reCaptchaField"""
 
     from captcha.fields import ReCaptchaField  # NOQA
-    from captcha.widgets import ReCaptchaV2Checkbox, ReCaptchaV2Invisible  # NOQA
+    from captcha.widgets import (
+        ReCaptchaV2Checkbox, 
+        ReCaptchaV2Invisible, 
+        ReCaptchaV3,
+    ) # NOQA
 
     CAPTCHA_WIDGETS["v2-checkbox"] = ReCaptchaV2Checkbox
     CAPTCHA_WIDGETS["v2-invisible"] = ReCaptchaV2Invisible
+    CAPTCHA_WIDGETS["v3"] = ReCaptchaV3
 
     CAPTCHA_FIELDS["v2-checkbox"] = ReCaptchaField
     CAPTCHA_FIELDS["v2-invisible"] = ReCaptchaField
+    CAPTCHA_FIELDS["v3"] = ReCaptchaField
 
     CAPTCHA_CHOICES += (
         ("v2-checkbox", f"reCaptcha - {_('v2 checkbox')}"),
         ("v2-invisible", f"reCaptcha - {_('v2 invisible')}"),
+        ("v3", f"reCaptcha - {_('v3')}"),
     )
 
 if apps.is_installed("hcaptcha"):
