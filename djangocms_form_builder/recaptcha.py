@@ -18,9 +18,12 @@ if apps.is_installed("captcha"):
         ReCaptchaV3,
     ) # NOQA
 
+    class ReCaptchaV3fixed(ReCaptchaV3):
+        template_name = "captcha/widget_v3_fixed.html"
+
     CAPTCHA_WIDGETS["v2-checkbox"] = ReCaptchaV2Checkbox
     CAPTCHA_WIDGETS["v2-invisible"] = ReCaptchaV2Invisible
-    CAPTCHA_WIDGETS["v3"] = ReCaptchaV3
+    CAPTCHA_WIDGETS["v3"] = ReCaptchaV3fixed
 
     CAPTCHA_FIELDS["v2-checkbox"] = ReCaptchaField
     CAPTCHA_FIELDS["v2-invisible"] = ReCaptchaField
