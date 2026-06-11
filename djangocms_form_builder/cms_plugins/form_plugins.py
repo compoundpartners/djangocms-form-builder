@@ -76,6 +76,25 @@ class CharFieldPlugin(mixin_factory("CharField"), FormElementPlugin):
 
 
 @plugin_pool.register_plugin
+class HiddenFieldPlugin(mixin_factory("HiddenField"), FormElementPlugin):
+    name = _("Hidden")
+    model = models.HiddenField
+    form = forms.HiddenFieldForm
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "field_name",
+                    "field_initial",
+                )
+            },
+        ),
+    )
+
+
+@plugin_pool.register_plugin
 class EmailFieldPlugin(mixin_factory("EmailField"), FormElementPlugin):
     name = _("Email")
     model = models.EmailField

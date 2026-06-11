@@ -211,6 +211,23 @@ class CharField(FormField):
         )
 
 
+class HiddenField(FormField):
+    class Meta:
+        proxy = True
+        verbose_name = _("Hidden field")
+
+    def get_form_field(self):
+        # Rendered bare (no label/wrapper) via the form template's
+        # ``form.hidden_fields`` loop. Not required, so a JS-populated value
+        # (or an empty one) never blocks submission. The value still lands in
+        # ``cleaned_data`` and is therefore saved/emailed with the entry.
+        return self.field_name, forms.CharField(
+            required=False,
+            initial=self.config.get("field_initial", ""),
+            widget=forms.HiddenInput(),
+        )
+
+
 class EmailField(FormField):
     class Meta:
         proxy = True
