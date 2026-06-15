@@ -36,7 +36,7 @@ class AjaxFormMixin(FormMixin):
     request = None
     instance = None
     parameter = {}
-    template_name = None
+    template_name = 'djangocms_form_builder/form.html'
 
     def json_return(self, errors, result, redirect, content):
         return JsonResponse(
@@ -206,7 +206,7 @@ class AjaxFormMixin(FormMixin):
         errors, redirect, content = (
             [],
             "",
-            render_to_string(self.template_name, context.flatten(), self.request),
+            render_to_string(self.template_name, context, self.request),
         )
         return JsonResponse(
             {
@@ -231,6 +231,9 @@ class CMSAjaxForm(AjaxFormMixin, CMSAjaxBase):
         """
         return super(CMSAjaxBase, self).get_form(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        return super(FormMixin, self).get_context_data(**kwargs)
+        
     def set_context(self, context, instance, placeholder):
         return {}
 
