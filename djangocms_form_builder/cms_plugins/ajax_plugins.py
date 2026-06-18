@@ -355,6 +355,9 @@ class FormPlugin(ActionMixin, CMSAjaxForm):
             "get_form_field" """
             if hasattr(instance, "get_form_field"):
                 name, field = instance.get_form_field()
+                custom_attrs = instance.config.get("attributes", {})
+                if custom_attrs:
+                    field.widget.attrs.update(custom_attrs)
                 fields[name] = field
             if (
                 instance.child_plugin_instances is None

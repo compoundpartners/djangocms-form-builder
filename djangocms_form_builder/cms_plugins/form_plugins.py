@@ -32,6 +32,13 @@ class FormElementPlugin(CMSPluginBase):
                 )
             },
         ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
+            },
+        ),
     )
 
     @classmethod
@@ -190,6 +197,13 @@ class SelectPlugin(mixin_factory("SelectField"), FormElementPlugin):
                 "fields": ("field_choices",),
             },
         ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
+            },
+        ),
     )
 
     def save_model(self, request, obj, form, change):
@@ -255,6 +269,13 @@ class BooleanFieldPlugin(mixin_factory("BooleanField"), FormElementPlugin):
                 )
             },
         ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
+            },
+        ),
     )
 
 
@@ -272,6 +293,13 @@ class SubmitPlugin(mixin_factory("SubmitButton"), FormElementPlugin):
                     "submit_cta",
                     "form_submit_context",
                 )
+            },
+        ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
             },
         ),
     )

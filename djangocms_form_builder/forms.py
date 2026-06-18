@@ -303,6 +303,7 @@ class FormFieldMixin(EntangledModelFormMixin):
                 "field_placeholder",
                 "field_required",
                 "field_help_text",
+                "attributes",
             ]
         }
 
@@ -341,6 +342,7 @@ class FormFieldMixin(EntangledModelFormMixin):
         help_text=_("Help text shown below the field."),
         widget=forms.Textarea,
     )
+    attributes = AttributesFormField()
 
 
 class CharFieldForm(mixin_factory("CharField"), FormFieldMixin, EntangledModelForm):
