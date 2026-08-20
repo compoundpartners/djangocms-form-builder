@@ -303,6 +303,7 @@ class FormFieldMixin(EntangledModelFormMixin):
                 "field_placeholder",
                 "field_required",
                 "field_help_text",
+                "attributes",
             ]
         }
 
@@ -341,6 +342,7 @@ class FormFieldMixin(EntangledModelFormMixin):
         help_text=_("Help text shown below the field."),
         widget=forms.Textarea,
     )
+    attributes = AttributesFormField()
 
 
 class CharFieldForm(mixin_factory("CharField"), FormFieldMixin, EntangledModelForm):
@@ -362,6 +364,37 @@ class CharFieldForm(mixin_factory("CharField"), FormFieldMixin, EntangledModelFo
         label=_("Maximum text length"),
         required=False,
         initial=None,
+    )
+
+
+class HiddenFieldForm(mixin_factory("HiddenField"), EntangledModelForm):
+    """Hidden form field. Only an internal name (and optional initial value)
+    are editable - it has no label/placeholder/required as it is never shown."""
+
+    class Meta:
+        model = models.FormField
+        entangled_fields = {
+            "config": [
+                "field_name",
+                "field_initial",
+            ]
+        }
+
+    field_name = forms.CharField(
+        label=_("Field name"),
+        help_text=_(
+            "Internal field name consisting of letters, numbers, underscores or hyphens"
+        ),
+        required=True,
+        validators=[validate_slug, validate_form_name],
+    )
+    field_initial = forms.CharField(
+        label=_("Initial value"),
+        help_text=_(
+            "Optional default value. Usually set dynamically (e.g. by JavaScript) "
+            "when the form is shown."
+        ),
+        required=False,
     )
 
 

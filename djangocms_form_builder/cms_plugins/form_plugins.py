@@ -20,6 +20,9 @@ class FormElementPlugin(CMSPluginBase):
     # Form elements are rendered by the surrounding FormPlugin, hence any change has to be
     # propageted up to the FormPlugin:
     is_local = False
+    # get_parent_classes walks the instance's ancestor tree to find a FormPlugin,
+    # so the result varies by position in the plugin hierarchy and must not be cached.
+    cache_parent_classes = False
 
     fieldsets = (
         (
@@ -30,6 +33,13 @@ class FormElementPlugin(CMSPluginBase):
                     ("field_required", "field_placeholder"),
                     "field_help_text",
                 )
+            },
+        ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
             },
         ),
     )
@@ -73,6 +83,25 @@ class CharFieldPlugin(mixin_factory("CharField"), FormElementPlugin):
     model = models.CharField
     form = forms.CharFieldForm
     settings_fields = (("min_length", "max_length"),)
+
+
+@plugin_pool.register_plugin
+class HiddenFieldPlugin(mixin_factory("HiddenField"), FormElementPlugin):
+    name = _("Hidden")
+    model = models.HiddenField
+    form = forms.HiddenFieldForm
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "field_name",
+                    "field_initial",
+                )
+            },
+        ),
+    )
 
 
 @plugin_pool.register_plugin
@@ -171,6 +200,13 @@ class SelectPlugin(mixin_factory("SelectField"), FormElementPlugin):
                 "fields": ("field_choices",),
             },
         ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
+            },
+        ),
     )
 
     def save_model(self, request, obj, form, change):
@@ -236,6 +272,13 @@ class BooleanFieldPlugin(mixin_factory("BooleanField"), FormElementPlugin):
                 )
             },
         ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
+            },
+        ),
     )
 
 
@@ -253,6 +296,13 @@ class SubmitPlugin(mixin_factory("SubmitButton"), FormElementPlugin):
                     "submit_cta",
                     "form_submit_context",
                 )
+            },
+        ),
+        (
+            _("Advanced Settings"),
+            {
+                "classes": ("collapse",),
+                "fields": ("attributes",),
             },
         ),
     )

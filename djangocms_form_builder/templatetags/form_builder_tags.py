@@ -56,7 +56,9 @@ def render_form(form, **kwargs):
 
 def get_bound_field(form, formfield):
     if form:
-        for field in form.visible_fields():
+        # Iterate all bound fields (visible *and* hidden) so hidden widgets
+        # are found - visible_fields() alone would skip them.
+        for field in form:
             if field.name == formfield:
                 return field
     return None
@@ -80,6 +82,9 @@ def render_widget(form, form_field, **kwargs):
     field = get_bound_field(form, form_field)
     if field is None:
         return ""
+    if field.is_hidden:
+        # Hidden fields render bare - no label, wrapper div or help text.
+        return mark_safe(str(field))
     floating_labels = get_option(form, "floating_labels")
     if field.field.widget.attrs.pop("no_field_sep", False):
         field_sep = ""

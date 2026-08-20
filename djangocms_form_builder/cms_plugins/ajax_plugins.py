@@ -44,7 +44,7 @@ class AjaxFormMixin(FormMixin):
     request = None
     instance = None
     parameter = {}
-    template_name = None
+    template_name = 'djangocms_form_builder/form.html'
 
     def json_return(self, errors, result, redirect, content):
         return JsonResponse(
@@ -204,6 +204,32 @@ class AjaxFormMixin(FormMixin):
         else:
             return self.form_invalid(form)
 
+    def ajax_get(self, request, instance, parameter=None):
+        if parameter is None:
+            parameter = {}
+        self.request = request
+        self.instance = instance
+        self.parameter = parameter
+        context = self.get_context_data(**parameter)
+        errors, redirect, content = (
+            [],
+            "",
+            render_to_string(self.template_name, context, self.request),
+        )
+        return JsonResponse(
+            {
+                "result": (
+                    ("result" if redirect == "result" else "success")
+                    if errors == []
+                    else "error"
+                ),
+                "redirect": redirect,
+                "errors": errors,
+                "field_errors": {},
+                "content": content,
+            }
+        )
+
 
 class CMSAjaxForm(AjaxFormMixin, CMSAjaxBase):
     def get_form(self, request, *args, **kwargs):
@@ -213,6 +239,9 @@ class CMSAjaxForm(AjaxFormMixin, CMSAjaxBase):
         """
         return super(CMSAjaxBase, self).get_form(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        return super(FormMixin, self).get_context_data(**kwargs)
+        
     def set_context(self, context, instance, placeholder):
         return {}
 
@@ -343,6 +372,9 @@ class FormPlugin(ActionMixin, CMSAjaxForm):
             "get_form_field" """
             if hasattr(instance, "get_form_field"):
                 name, field = instance.get_form_field()
+                custom_attrs = instance.config.get("attributes", {})
+                if custom_attrs:
+                    field.widget.attrs.update(custom_attrs)
                 fields[name] = field
             if (
                 instance.child_plugin_instances is None

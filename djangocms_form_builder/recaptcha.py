@@ -20,9 +20,12 @@ if apps.is_installed("captcha"):
         ReCaptchaV3,
     ) # NOQA
 
+    class ReCaptchaV3fixed(ReCaptchaV3):
+        template_name = "captcha/widget_v3_fixed.html"
+
     CAPTCHA_WIDGETS["v2-checkbox"] = ReCaptchaV2Checkbox
     CAPTCHA_WIDGETS["v2-invisible"] = ReCaptchaV2Invisible
-    CAPTCHA_WIDGETS["v3"] = ReCaptchaV3
+    CAPTCHA_WIDGETS["v3"] = ReCaptchaV3fixed
 
     CAPTCHA_FIELDS["v2-checkbox"] = ReCaptchaField
     CAPTCHA_FIELDS["v2-invisible"] = ReCaptchaField
@@ -70,9 +73,9 @@ def get_recaptcha_field(instance):
         },
     }
     widget_params["attrs"]["no_field_sep"] = True
-    if config.get("captcha_widget", "") == "v3":
+    if instance.captcha_widget == "v3":
         widget_params["attrs"]["required_score"] = coerce_decimal(
-            config.get("captcha_requirement", 0.5)
+            instance.captcha_requirement or 0.5
         )  # installing recaptcha 3 ?
     if not widget_params["api_params"]:
         del widget_params["api_params"]
