@@ -14,6 +14,7 @@ from . import recaptcha, settings
 from .entry_model import FormEntry  # NoQA
 from .fields import AttributesField
 from .helpers import coerce_decimal, mark_safe_lazy
+from .validators import validate_alphabet
 
 MAX_LENGTH = 256
 
@@ -208,6 +209,23 @@ class CharField(FormField):
             widget=forms.TextInput(
                 attrs=dict(placeholder=self.config.get("field_placeholder", ""))
             ),
+        )
+
+
+class AlphabetField(FormField):
+    class Meta:
+        proxy = True
+        verbose_name = _("Alphabet field")
+
+    def get_form_field(self):
+        return self.field_name, forms.CharField(
+            label=self.config.get("field_label", ""),
+            required=self.config.get("field_required", False),
+            help_text=self.config.get("field_help_text", ""),
+            widget=forms.TextInput(
+                attrs=dict(placeholder=self.config.get("field_placeholder", ""))
+            ),
+            validators=[validate_alphabet]
         )
 
 
@@ -491,3 +509,27 @@ class SubmitButton(FormField):
     class Meta:
         proxy = True
         verbose_name = _("Submit button")
+
+
+try:
+    from django_countries import countries
+    from django_countries.widgets import CountrySelectWidget
+except ImportError:
+    countries = []
+    CountrySelectWidget = forms.Select
+
+class CountryField(FormField):
+    class Meta:
+        proxy = True
+        verbose_name = _("Country select")
+
+    def get_form_field(self):
+        return self.field_name, forms.CharField(
+            label=self.config.get("field_label", ""),
+            required=self.config.get("field_required", False),
+            help_text=self.config.get("field_help_text", ""),
+            initial=self.config.get("field_initial", ""),
+            widget=CountrySelectWidget(
+                choices=[['', self.config.get("field_placeholder", "")]] + list(countries),
+            ),
+        )

@@ -1,4 +1,5 @@
 from django import forms
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_slug
 from django.utils.translation import gettext_lazy as _
@@ -646,3 +647,26 @@ class SubmitButtonForm(
         choices=constants.SUBMIT_BUTTON_CHOICES,
         initial=constants.SUBMIT_BUTTON_CHOICES[0][0],
     )
+
+
+if apps.is_installed("django_countries"):
+    from django_countries import countries
+    from django_countries.widgets import CountrySelectWidget
+
+    class CountryFieldForm(mixin_factory("CountryField"), FormFieldMixin, EntangledModelForm):
+
+        class Meta:
+            model = models.FormField
+            entangled_fields = {
+                "config": [
+                    "field_initial",
+                ]
+            }
+
+        field_initial = forms.CharField(
+            label=_("Initial value"),
+            required=False,
+            widget=CountrySelectWidget(
+                choices=[['', '']] + list(countries)
+            ),
+        )

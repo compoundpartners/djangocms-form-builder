@@ -1,3 +1,4 @@
+from django.apps import apps
 from cms.plugin_base import CMSPluginBase
 from cms.plugin_pool import plugin_pool
 from django.utils.encoding import force_str
@@ -81,6 +82,14 @@ class FormElementPlugin(CMSPluginBase):
 class CharFieldPlugin(mixin_factory("CharField"), FormElementPlugin):
     name = _("Text")
     model = models.CharField
+    form = forms.CharFieldForm
+    settings_fields = (("min_length", "max_length"),)
+
+
+@plugin_pool.register_plugin
+class AlphabetFieldPlugin(mixin_factory("AlphabetField"), FormElementPlugin):
+    name = _("Alphabet only")
+    model = models.AlphabetField
     form = forms.CharFieldForm
     settings_fields = (("min_length", "max_length"),)
 
@@ -310,3 +319,12 @@ class SubmitPlugin(mixin_factory("SubmitButton"), FormElementPlugin):
     form = forms.SubmitButtonForm
 
     render_template = f"djangocms_form_builder/{settings.framework}/widgets/submit.html"
+
+
+if apps.is_installed("django_countries"):
+    @plugin_pool.register_plugin
+    class CountryFieldPlugin(mixin_factory("CountryField"), FormElementPlugin):
+        name = _("Country select")
+        model = models.CountryField
+        form = forms.CountryFieldForm
+        settings_fields = (("field_initial",),)
